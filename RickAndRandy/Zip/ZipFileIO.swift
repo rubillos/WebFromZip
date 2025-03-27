@@ -44,22 +44,70 @@ public struct ZipFileIO: Sendable {
 		self.zipArchivePath = path
 				
 		do {
-			let zipArchiveURL = URL(fileURLWithPath: self.zipArchivePath)
-			let zipArchive = try Archive(url: zipArchiveURL, accessMode: .read)
-			
-			lookup = [:]
-			
-			let dir = zipArchive.makeIterator()
-			for entry in dir {
-				if !entry.isCompressed {
-					let name = entry.path
-					let offset = entry.dataOffset
-					let length = entry.uncompressedSize
-					self.lookup[name] = ZipEntry(offset: offset, length: length)
-//					logger.info("Entry: \(name) - off: \(offset) - len: \(length)")
+			let indexPath = self.zipArchivePath.replacingOccurrences(of: ".zip", with: ".idx")
+			if FileManager.default.fileExists(atPath: indexPath) {
+				logger.info("Reading index file")
+				let data = try Data(contentsOf: URL(fileURLWithPath: indexPath))
+				var offset = 0
+				while offset < data.count {
+					let keyLength = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt32.self) }
+					offset += MemoryLayout<UInt32>.size
+					let keyData = data.subdata(in: offset..<(offset + Int(keyLength)))
+					offset += Int(keyLength)
+					let key = String(data: keyData, encoding: .utf8)!
+					if offset % 8 != 0 {
+						let padding = 8 - (offset % 8)
+						offset += padding
+					}
+					let entryOffset = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
+					offset += MemoryLayout<UInt64>.size
+					let entryLength = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
+					offset += MemoryLayout<UInt64>.size
+					self.lookup[key] = ZipEntry(offset: entryOffset, length: entryLength)
 				}
+				logger.info("Archive contains \(self.lookup.count) files")
 			}
-			logger.info("Archive contains \(self.lookup.count) files")
+			else {
+				logger.info("Reading from archive")
+				let zipArchiveURL = URL(fileURLWithPath: self.zipArchivePath)
+				let zipArchive = try Archive(url: zipArchiveURL, accessMode: .read)
+				
+				lookup = [:]
+				
+				let dir = zipArchive.makeIterator()
+				for entry in dir {
+					if !entry.isCompressed {
+						let name = entry.path
+						let offset = entry.dataOffset
+						let length = entry.uncompressedSize
+						self.lookup[name] = ZipEntry(offset: offset, length: length)
+					}
+				}
+				logger.info("Archive contains \(self.lookup.count) files")
+
+				// Serialize lookup dictionary to a compact binary format and write to indexPath
+				logger.info("Writing index file")
+				var binaryData = Data()
+				var offset = 0
+				for (key, value) in self.lookup {
+					if let keyData = key.data(using: .utf8) {
+						var keyLength = UInt32(keyData.count)
+						binaryData.append(Data(bytes: &keyLength, count: MemoryLayout<UInt32>.size))
+						binaryData.append(keyData)
+						offset += MemoryLayout<UInt32>.size + keyData.count
+						if offset % 8 != 0 {
+							let padding = 8 - (offset % 8)
+							binaryData.append(Data(count: padding))
+							offset += padding
+						}
+						var offset = value.offset
+						var length = value.length
+						binaryData.append(Data(bytes: &offset, count: MemoryLayout<UInt64>.size))
+						binaryData.append(Data(bytes: &length, count: MemoryLayout<UInt64>.size))
+					}
+				}
+				try binaryData.write(to: URL(fileURLWithPath: indexPath))
+			}
 		} catch {
 			logger.info("Failed to initialize zip archive: \(error)")
 		}
@@ -127,6 +175,11 @@ public struct ZipFileIO: Sendable {
 		guard let entry = entryForPath(path) else {
 			throw HTTPError(.notFound)
 		}
+		if entry.length == 0 {
+			return ResponseBody(contentLength: 0) { writer in
+				try await writer.finish(nil)
+			}
+		}
 		let zipRange: ClosedRange<UInt64> = entry.offset...(entry.offset+entry.length-1)
 		return self.readFile(range: zipRange, context: context, chunkLength: chunkLength)
 	}
@@ -149,6 +202,11 @@ public struct ZipFileIO: Sendable {
 	) async throws -> ResponseBody {
 		guard let entry = entryForPath(path) else {
 			throw HTTPError(.notFound)
+		}
+		if entry.length == 0 {
+			return ResponseBody(contentLength: 0) { writer in
+				try await writer.finish(nil)
+			}
 		}
 		let dataOffset = entry.offset
 		let dataSize = entry.length

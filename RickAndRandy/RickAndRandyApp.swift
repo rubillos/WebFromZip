@@ -12,6 +12,7 @@ struct RickAndRandyApp: App {
 	var body: some Scene {
 		WindowGroup {
 			ContentView()
+				.background(Color(.gray).opacity(0.25))
 		}
 	}
 }

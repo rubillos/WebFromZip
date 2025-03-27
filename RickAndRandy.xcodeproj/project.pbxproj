@@ -28,16 +28,16 @@
 
 /* Begin PBXFileReference section */
 		255341252D8DFEB8001492B9 /* GCDWebServer.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = GCDWebServer.xcodeproj; sourceTree = "<group>"; };
-		255987D72D88896C00153DA3 /* RickAndRandy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RickAndRandy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		255987D72D88896C00153DA3 /* R and R.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "R and R.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		255987EA2D88996F00153DA3 /* Exceptions for "RickAndRandy" folder in "RickAndRandy" target */ = {
+		255987EA2D88996F00153DA3 /* Exceptions for "RickAndRandy" folder in "R and R" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 255987D62D88896C00153DA3 /* RickAndRandy */;
+			target = 255987D62D88896C00153DA3 /* R and R */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -45,7 +45,7 @@
 		255987D92D88896C00153DA3 /* RickAndRandy */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				255987EA2D88996F00153DA3 /* Exceptions for "RickAndRandy" folder in "RickAndRandy" target */,
+				255987EA2D88996F00153DA3 /* Exceptions for "RickAndRandy" folder in "R and R" target */,
 			);
 			path = RickAndRandy;
 			sourceTree = "<group>";
@@ -93,7 +93,7 @@
 		255987D82D88896C00153DA3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				255987D72D88896C00153DA3 /* RickAndRandy.app */,
+				255987D72D88896C00153DA3 /* R and R.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -101,9 +101,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		255987D62D88896C00153DA3 /* RickAndRandy */ = {
+		255987D62D88896C00153DA3 /* R and R */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 255987E52D88896C00153DA3 /* Build configuration list for PBXNativeTarget "RickAndRandy" */;
+			buildConfigurationList = 255987E52D88896C00153DA3 /* Build configuration list for PBXNativeTarget "R and R" */;
 			buildPhases = (
 				255987D32D88896C00153DA3 /* Sources */,
 				255987D42D88896C00153DA3 /* Frameworks */,
@@ -117,7 +117,7 @@
 			fileSystemSynchronizedGroups = (
 				255987D92D88896C00153DA3 /* RickAndRandy */,
 			);
-			name = RickAndRandy;
+			name = "R and R";
 			packageProductDependencies = (
 				2575D1AA2D8F6CBC002137B5 /* Hummingbird */,
 				2575D1AC2D8F6CBC002137B5 /* HummingbirdCore */,
@@ -125,7 +125,7 @@
 				259EEB432D91DE110059413F /* NIO */,
 			);
 			productName = RickAndRandy;
-			productReference = 255987D72D88896C00153DA3 /* RickAndRandy.app */;
+			productReference = 255987D72D88896C00153DA3 /* R and R.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -167,7 +167,7 @@
 			);
 			projectRoot = "";
 			targets = (
-				255987D62D88896C00153DA3 /* RickAndRandy */,
+				255987D62D88896C00153DA3 /* R and R */,
 			);
 		};
 /* End PBXProject section */
@@ -394,7 +394,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		255987E52D88896C00153DA3 /* Build configuration list for PBXNativeTarget "RickAndRandy" */ = {
+		255987E52D88896C00153DA3 /* Build configuration list for PBXNativeTarget "R and R" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				255987E62D88896C00153DA3 /* Debug */,
