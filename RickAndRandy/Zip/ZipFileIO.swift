@@ -19,6 +19,10 @@ public struct ZipEntry : Sendable{
 	let length: UInt64
 }
 
+extension Notification.Name {
+	static let zipServerIndexing = Notification.Name("zipServerIndexing")
+}
+
 /// Manages File reading and writing.
 public struct ZipFileIO: Sendable {
 	let fileIO: NonBlockingFileIO
@@ -65,10 +69,13 @@ public struct ZipFileIO: Sendable {
 					offset += MemoryLayout<UInt64>.size
 					self.lookup[key] = ZipEntry(offset: entryOffset, length: entryLength)
 				}
-				logger.info("Archive contains \(self.lookup.count) files")
+				logger.info("Index contains \(self.lookup.count) file entries")
 			}
 			else {
 				logger.info("Reading from archive")
+
+				NotificationCenter.default.post(name: .zipServerIndexing, object: nil)
+
 				let zipArchiveURL = URL(fileURLWithPath: self.zipArchivePath)
 				let zipArchive = try Archive(url: zipArchiveURL, accessMode: .read)
 				
