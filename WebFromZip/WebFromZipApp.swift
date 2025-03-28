@@ -1,6 +1,6 @@
 //
-//  RickAndRandyApp.swift
-//  RickAndRandy
+//  WebFromZipApp.swift
+//  WebFromZip
 //
 //  Created by Randy on 3/17/25.
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct RickAndRandyApp: App {
+struct WebFromZipApp: App {
 	var body: some Scene {
 		WindowGroup {
 			ContentView()
