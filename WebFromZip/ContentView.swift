@@ -2,8 +2,6 @@ import SwiftUI
 @preconcurrency import WebKit
 import Foundation
 
-//NSLog(@"%@", NSHomeDirectory());
-
 struct WebView: UIViewRepresentable {
 	@Binding var webView: WKWebView
 	let url: URL
@@ -40,7 +38,6 @@ struct ContentView: View {
 	@State private var errorMsg = ""
 	@State private var orientation = UIDeviceOrientation.portrait
 
-	//	let u = URL(string:"https://rickandrandy.com")
 	let u = URL(string:"http://localhost:8080/index.html")
 	
 	var body: some View {
