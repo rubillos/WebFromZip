@@ -14,26 +14,47 @@ extension Notification.Name {
 }
 
 struct ZipServer {
-	static func run(_ bundlePath: String) async throws {
-		let logger = Logger(label: "swift-web")
-		let router = Router()
-		
-		//		router.add(middleware: FileMiddleware("/Users/randy/Sites/PortlandAve-Mobile", searchForIndexHtml: true))
-		router.add(middleware: ZipMiddleware(bundlePath, logger: logger))
-		//		router.add(middleware: LogRequestsMiddleware(.info))
-		
-		let app = Application(
-			router: router,
-			configuration: .init(address: .hostname("127.0.0.1", port: 8080)),
-			logger: logger
-		)
-		
-		print("Server started")
-		DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-			NotificationCenter.default.post(name: .zipServerStarted, object: nil)
+	static var zipMiddle: (any MiddlewareProtocol<Request, Response, BasicRequestContext>)? = nil
+	static var router: Router<BasicRequestContext>? = nil
+	static var logger: Logger? = nil
+	static var serverTask: Task<Void, Never>? = nil
+	
+	static func run(_ bundlePath: String?) {
+		if self.router == nil && bundlePath != nil {
+			self.logger = Logger(label: "swift-web")
+			self.router = Router()
+			self.zipMiddle = ZipMiddleware(bundlePath!, logger: self.logger!)
+			self.router?.add(middleware: self.zipMiddle!)
+			//		self.router.add(middleware: LogRequestsMiddleware(.info))
 		}
-		
-		// Start the ZipServer
-		try await app.runService()
+
+		if self.router != nil && self.serverTask == nil {
+			let app = Application(
+				router: self.router!,
+				configuration: .init(address: .hostname("127.0.0.1", port: 8080)),
+				logger: self.logger
+			)
+			
+			print("Server started")
+			DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+				NotificationCenter.default.post(name: .zipServerStarted, object: nil)
+			}
+			self.serverTask = Task {
+				do {
+					try await app.runService()
+					print("Server finished")
+				} catch {
+					print("Failed to start server: \(error)")
+				}
+			}
+		}
+	}
+	
+	static func stop() {
+		if self.serverTask != nil {
+			print("Stopping server")
+			self.serverTask?.cancel()
+			self.serverTask = nil
+		}
 	}
 }

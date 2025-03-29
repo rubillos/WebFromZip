@@ -74,10 +74,24 @@ struct ContentView: View {
 				self.isIndexing = true
 				print("Notification: Indexing...")
 			}
+			NotificationCenter.default.addObserver(forName: .zipServerStarted, object: nil, queue: .main) { _ in
+				if !self.canGoHome {
+					self.canGoHome = true
+					self.goHome()
+				}
+			}
 			startServer()
+			NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in
+				ZipServer.stop()
+			}
+			NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+				ZipServer.run(nil)
+			}
 		}
 		.onDisappear {
 			UIDevice.current.endGeneratingDeviceOrientationNotifications()
+			NotificationCenter.default.removeObserver(self, name: UIApplication.willResignActiveNotification, object: nil)
+			NotificationCenter.default.removeObserver(self, name: UIApplication.didBecomeActiveNotification, object: nil)
 		}
 	}
 
@@ -203,6 +217,19 @@ struct ContentView: View {
 		}
 	}
 	
+	func addSkipBackupAttributeToItem(at path: String) -> Bool {
+		var url = URL(fileURLWithPath: path)
+		var resourceValues = URLResourceValues()
+		resourceValues.isExcludedFromBackup = true
+		do {
+			try url.setResourceValues(resourceValues)
+			return true
+		} catch {
+			print("Failed to set resource value for \(url): \(error.localizedDescription)")
+			return false
+		}
+	}
+
 	func getFirstZipFilePath() -> String? {
 		let fileManager = FileManager.default
 		let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
@@ -226,10 +253,10 @@ struct ContentView: View {
 			return nil
 		}
 	}
-
+	
 	func startServer() {
-		//		let bundlePath = Bundle.main.bundlePath + "/" + zipName
-
+		errorMsg = ""
+		
 		var zipPath: String?
 		
 		#if targetEnvironment(simulator)
@@ -239,25 +266,14 @@ struct ContentView: View {
 		}
 		#else
 		zipPath = getFirstZipFilePath()
+		if (zipPath != nil) {
+			_ = addSkipBackupAttributeToItem(at: zipPath!)
+		}
 		#endif
 		
 		if zipPath != nil {
 			print("Starting server with zip file: \(zipPath!)")
-			
-			NotificationCenter.default.addObserver(forName: .zipServerStarted, object: nil, queue: .main) { _ in
-				self.goHome()
-			}
-			
-			Task {
-				do {
-					try await ZipServer.run(zipPath!)
-				} catch {
-					print("Failed to start server: \(error)")
-					errorMsg = "Failed to start server: \(error)"
-				}
-			}
-			
-			self.canGoHome = true
+			ZipServer.run(zipPath!)
 		}
 		else {
 			errorMsg = "No .zip archive found\nin the FileSharing Folder.\n\nPlease add a .zip archive and retry."
