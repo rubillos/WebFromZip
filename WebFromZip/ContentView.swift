@@ -2,6 +2,19 @@ import SwiftUI
 @preconcurrency import WebKit
 import Foundation
 
+struct Constants {
+	static let httpScheme = "http://"
+	static let httpsScheme = "https://"
+	static let localhost = "localhost:8080"
+	static let rickAndRandy = "rickandrandy.com"
+	static let wwwRickAndRandy = "www.\(rickAndRandy)"
+	static let defaultIndex = "index.html"
+	static let slashChar = "/"
+	static let homePage = "\(httpScheme)\(localhost)\(slashChar)\(defaultIndex)"
+	
+	static let simZipPath = "/Users/randy/Sites/RickAndRandy.zip"
+}
+
 struct WebView: UIViewRepresentable {
 	@Binding var webView: WKWebView
 	let url: URL
@@ -12,18 +25,46 @@ struct WebView: UIViewRepresentable {
 	}
 	
 	func updateUIView(_ uiView: WKWebView, context: Context) {
-
 	}
 
 	func makeCoordinator() -> Coordinator {
 		Coordinator(self)
 	}
 
-	class Coordinator: NSObject, WKNavigationDelegate {
+	class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
 		var parent: WebView
 
 		init(_ parent: WebView) {
 			self.parent = parent
+		}
+
+		func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+			if let url = navigationAction.request.url {
+				let urlString = url.absoluteString
+				var newURLString = urlString
+				
+				newURLString = newURLString.replacingOccurrences(of: Constants.wwwRickAndRandy, with: Constants.localhost)
+				newURLString = newURLString.replacingOccurrences(of: Constants.rickAndRandy, with: Constants.localhost)
+				
+				if urlString != newURLString {
+					newURLString = newURLString.replacingOccurrences(of: Constants.httpsScheme, with: Constants.httpScheme)
+				}
+				
+				if newURLString.contains(Constants.localhost) && newURLString.hasSuffix(Constants.slashChar) {
+					newURLString += Constants.defaultIndex
+				}
+					
+				if urlString != newURLString {
+					if let modifiedURL = URL(string: newURLString) {
+						print("Original URL: \(url)")
+						print("Modified URL: \(modifiedURL)")
+						webView.load(URLRequest(url: modifiedURL))
+						decisionHandler(.cancel)
+						return
+					}
+				}
+			}
+			decisionHandler(.allow)
 		}
 	}
 }
@@ -38,7 +79,7 @@ struct ContentView: View {
 	@State private var errorMsg = ""
 	@State private var orientation = UIDeviceOrientation.portrait
 
-	let u = URL(string:"http://localhost:8080/index.html")
+	let u = URL(string:Constants.homePage)
 	
 	var body: some View {
 		Group {
@@ -260,7 +301,7 @@ struct ContentView: View {
 		var zipPath: String?
 		
 		#if targetEnvironment(simulator)
-		let simZipPath = "/Users/randy/Sites/RickAndRandy.zip"
+		let simZipPath = Constants.simZipPath
 		if FileManager.default.fileExists(atPath: simZipPath) {
 			zipPath = simZipPath
 		}
