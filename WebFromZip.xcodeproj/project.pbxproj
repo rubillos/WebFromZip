@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		251F14162D99A4DE0057C4B2 /* _NIOFileSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 251F14152D99A4DE0057C4B2 /* _NIOFileSystem */; };
 		2575D1AB2D8F6CBC002137B5 /* Hummingbird in Frameworks */ = {isa = PBXBuildFile; productRef = 2575D1AA2D8F6CBC002137B5 /* Hummingbird */; };
 		2575D1AD2D8F6CBC002137B5 /* HummingbirdCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2575D1AC2D8F6CBC002137B5 /* HummingbirdCore */; };
 		2575D1AF2D8F6CBC002137B5 /* HummingbirdRouter in Frameworks */ = {isa = PBXBuildFile; productRef = 2575D1AE2D8F6CBC002137B5 /* HummingbirdRouter */; };
@@ -58,6 +59,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2575D1AD2D8F6CBC002137B5 /* HummingbirdCore in Frameworks */,
+				251F14162D99A4DE0057C4B2 /* _NIOFileSystem in Frameworks */,
 				259EEB442D91DE110059413F /* NIO in Frameworks */,
 				2575D1AB2D8F6CBC002137B5 /* Hummingbird in Frameworks */,
 				2575D1AF2D8F6CBC002137B5 /* HummingbirdRouter in Frameworks */,
@@ -123,6 +125,7 @@
 				2575D1AC2D8F6CBC002137B5 /* HummingbirdCore */,
 				2575D1AE2D8F6CBC002137B5 /* HummingbirdRouter */,
 				259EEB432D91DE110059413F /* NIO */,
+				251F14152D99A4DE0057C4B2 /* _NIOFileSystem */,
 			);
 			productName = RickAndRandy;
 			productReference = 255987D72D88896C00153DA3 /* R and R.app */;
@@ -425,6 +428,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		251F14152D99A4DE0057C4B2 /* _NIOFileSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 259EEB422D91DE110059413F /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = _NIOFileSystem;
+		};
 		2575D1AA2D8F6CBC002137B5 /* Hummingbird */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 2575D1A92D8F6CBC002137B5 /* XCRemoteSwiftPackageReference "hummingbird" */;

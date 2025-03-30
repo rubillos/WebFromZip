@@ -1,6 +1,6 @@
 //
 //  ZipServer.swift
-//  RickAndRandy
+//  WebFromZip
 //
 //  Created by Randy on 3/22/25.
 //
@@ -19,7 +19,7 @@ struct ZipServer {
 	static var logger: Logger? = nil
 	static var serverTask: Task<Void, Never>? = nil
 	
-	static func run(_ bundlePath: String?) {
+	static func run(_ bundlePath: String? = nil) {
 		if self.router == nil && bundlePath != nil {
 			self.logger = Logger(label: "swift-web")
 			self.router = Router()

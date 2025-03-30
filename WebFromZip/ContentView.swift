@@ -1,19 +1,13 @@
+//
+//  ContentView.swift
+//  WebFromZip
+//
+//  Created by Randy on 3/29/25.
+//
+
 import SwiftUI
 @preconcurrency import WebKit
 import Foundation
-
-struct Constants {
-	static let httpScheme = "http://"
-	static let httpsScheme = "https://"
-	static let localhost = "localhost:8080"
-	static let rickAndRandy = "rickandrandy.com"
-	static let wwwRickAndRandy = "www.\(rickAndRandy)"
-	static let defaultIndex = "index.html"
-	static let slashChar = "/"
-	static let homePage = "\(httpScheme)\(localhost)\(slashChar)\(defaultIndex)"
-	
-	static let simZipPath = "/Users/randy/Sites/RickAndRandy.zip"
-}
 
 struct WebView: UIViewRepresentable {
 	@Binding var webView: WKWebView
@@ -43,13 +37,16 @@ struct WebView: UIViewRepresentable {
 				let urlString = url.absoluteString
 				var newURLString = urlString
 				
-				newURLString = newURLString.replacingOccurrences(of: Constants.wwwRickAndRandy, with: Constants.localhost)
-				newURLString = newURLString.replacingOccurrences(of: Constants.rickAndRandy, with: Constants.localhost)
+				// Redirect URLs from main web URL to localhost
+				newURLString = newURLString.replacingOccurrences(of: Constants.mainWebURLwww, with: Constants.localhost)
+				newURLString = newURLString.replacingOccurrences(of: Constants.mainWebURL, with: Constants.localhost)
 				
+				// Redirect https to http if redirecting from the main web URL
 				if urlString != newURLString {
 					newURLString = newURLString.replacingOccurrences(of: Constants.httpsScheme, with: Constants.httpScheme)
 				}
 				
+				// For localhost URLs, add default index if it ends with a slash
 				if newURLString.contains(Constants.localhost) && newURLString.hasSuffix(Constants.slashChar) {
 					newURLString += Constants.defaultIndex
 				}
@@ -58,8 +55,8 @@ struct WebView: UIViewRepresentable {
 					if let modifiedURL = URL(string: newURLString) {
 						print("Original URL: \(url)")
 						print("Modified URL: \(modifiedURL)")
-						webView.load(URLRequest(url: modifiedURL))
 						decisionHandler(.cancel)
+						webView.load(URLRequest(url: modifiedURL))
 						return
 					}
 				}
@@ -121,12 +118,18 @@ struct ContentView: View {
 					self.goHome()
 				}
 			}
+
+			for pathRegex in Constants.pathRegexes {
+				ZipFileIO.addRegexEntry(pattern: pathRegex[0], replacement: pathRegex[1])
+			}
+
 			startServer()
+
 			NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in
 				ZipServer.stop()
 			}
 			NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
-				ZipServer.run(nil)
+				ZipServer.run()
 			}
 		}
 		.onDisappear {
@@ -182,6 +185,12 @@ struct ContentView: View {
 		}
 	}
 
+	struct ButtonLabels {
+		static let back = "◀︎"
+		static let home = "⌂"
+		static let forward = "▶︎"
+	}
+
 	var controls: some View {
 		Group {
 			if orientation.isPortrait {
@@ -193,14 +202,14 @@ struct ContentView: View {
 							webView.goBack()
 						}
 					}) {
-						Text("◀︎")
+						Text(ButtonLabels.back)
 					}
 					.disabled(!canGoBack)
 					
 					Button(action: {
 						goHome()
 					}) {
-						Text("⌂")
+						Text(ButtonLabels.home)
 					}
 					.disabled(!canGoHome)
 					
@@ -209,7 +218,7 @@ struct ContentView: View {
 							webView.goForward()
 						}
 					}) {
-						Text("▶︎")
+						Text(ButtonLabels.forward)
 					}
 					.disabled(!canGoForward)
 					
@@ -225,20 +234,20 @@ struct ContentView: View {
 							webView.goBack()
 						}
 					}) {
-						Text("◀︎")
+						Text(ButtonLabels.back)
 					}
 					.disabled(!canGoBack)
 					Button(action: {
 						goHome()
 					}) {
-						Text("⌂")
+						Text(ButtonLabels.home)
 					}
 					Button(action: {
 						if webView.canGoForward {
 							webView.goForward()
 						}
 					}) {
-						Text("▶︎")
+						Text(ButtonLabels.forward)
 					}
 					.disabled(!canGoForward)
 					Spacer()
@@ -252,7 +261,7 @@ struct ContentView: View {
 
 	func goHome() {
 		if let url = u {
-			print("go to home")
+			print("goHome")
 			webView.load(URLRequest(url: url))
 			showProgressView = false
 		}

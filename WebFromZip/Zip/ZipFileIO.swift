@@ -1,6 +1,6 @@
 //
 //  ZipFileIO.swift
-//  RickAndRandy
+//  WebFromZip
 //
 //  Created by Randy on 3/24/25.
 //
@@ -19,8 +19,35 @@ public struct ZipEntry : Sendable{
 	let length: UInt64
 }
 
+public struct RegexEntry : Sendable {
+	let regex: NSRegularExpression
+	let replacement: String
+
+	/// Initialize RegexEntry
+	/// - Parameters:
+	///   - pattern: Pattern to match
+	///   - replacement: Replacement string
+	public init(pattern: String, replacement: String) {
+		self.regex = try! NSRegularExpression(pattern: pattern, options: [])
+		self.replacement = replacement
+	}
+}
+
 extension Notification.Name {
 	static let zipServerIndexing = Notification.Name("zipServerIndexing")
+}
+
+extension NSRegularExpression {
+	func stringByReplacingMatches(
+		in string: String,
+		withTemplate templ: String
+	) -> String {
+		return self.stringByReplacingMatches(
+			in: string,
+			options: [],
+			range: NSRange(location: 0, length: string.utf16.count),
+			withTemplate: templ)
+	}
 }
 
 /// Manages File reading and writing.
@@ -29,6 +56,12 @@ public struct ZipFileIO: Sendable {
 	let logger: Logger
 	var lookup: [String: ZipEntry] = [:]
 	var zipArchivePath: String = ""
+	
+	static var regexList: [RegexEntry] = []
+	
+	static public func addRegexEntry(pattern: String, replacement: String) {
+		self.regexList.append(RegexEntry(pattern: pattern, replacement: replacement))
+	}
 
 	/// Initialize ZipFileIO
 	///   - zipArchivePath: Root folder to serve files from
@@ -51,22 +84,24 @@ public struct ZipFileIO: Sendable {
 			let indexPath = self.zipArchivePath.replacingOccurrences(of: ".zip", with: ".idx")
 			if FileManager.default.fileExists(atPath: indexPath) {
 				logger.info("Reading index file")
+				self.lookup = [:]
+				let size64 = MemoryLayout<UInt64>.size
 				let data = try Data(contentsOf: URL(fileURLWithPath: indexPath))
 				var offset = 0
 				while offset < data.count {
 					let keyLength = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt32.self) }
 					offset += MemoryLayout<UInt32>.size
 					let keyData = data.subdata(in: offset..<(offset + Int(keyLength)))
-					offset += Int(keyLength)
 					let key = String(data: keyData, encoding: .utf8)!
-					if offset % 8 != 0 {
-						let padding = 8 - (offset % 8)
+					offset += Int(keyLength)
+					if offset % size64 != 0 {
+						let padding = size64 - (offset % size64)
 						offset += padding
 					}
 					let entryOffset = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
-					offset += MemoryLayout<UInt64>.size
+					offset += size64
 					let entryLength = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
-					offset += MemoryLayout<UInt64>.size
+					offset += size64
 					self.lookup[key] = ZipEntry(offset: entryOffset, length: entryLength)
 				}
 				logger.info("Index contains \(self.lookup.count) file entries")
@@ -94,6 +129,7 @@ public struct ZipFileIO: Sendable {
 
 				// Serialize lookup dictionary to a compact binary format and write to indexPath
 				logger.info("Writing index file")
+				let size64 = MemoryLayout<UInt64>.size
 				var binaryData = Data()
 				var offset = 0
 				for (key, value) in self.lookup {
@@ -102,15 +138,15 @@ public struct ZipFileIO: Sendable {
 						binaryData.append(Data(bytes: &keyLength, count: MemoryLayout<UInt32>.size))
 						binaryData.append(keyData)
 						offset += MemoryLayout<UInt32>.size + keyData.count
-						if offset % 8 != 0 {
-							let padding = 8 - (offset % 8)
+						if offset % size64 != 0 {
+							let padding = size64 - (offset % size64)
 							binaryData.append(Data(count: padding))
 							offset += padding
 						}
 						var offset = value.offset
 						var length = value.length
-						binaryData.append(Data(bytes: &offset, count: MemoryLayout<UInt64>.size))
-						binaryData.append(Data(bytes: &length, count: MemoryLayout<UInt64>.size))
+						binaryData.append(Data(bytes: &offset, count: size64))
+						binaryData.append(Data(bytes: &length, count: size64))
 					}
 				}
 				try binaryData.write(to: URL(fileURLWithPath: indexPath))
@@ -142,15 +178,19 @@ public struct ZipFileIO: Sendable {
 	/// - Returns: Entry
 	public func entryForPath(_ path: String) -> ZipEntry? {
 		var path = removeInitialSlash(path: path)
-		let regex = try! NSRegularExpression(pattern: "@\\d+x", options: [])
-		let range = NSRange(location: 0, length: path.utf16.count)
-		path = regex.stringByReplacingMatches(in: path, options: [], range: range, withTemplate: "")
-		path = path.replacingOccurrences(of: "360", with: "-1080").replacingOccurrences(of: "-540", with: "-1080").replacingOccurrences(of: "-2160", with: "-1080")
-		guard let entry = self.lookup[path] else {
-			path = path.replacingOccurrences(of: ".m4v", with: "-HEVC.m4v")
-			return self.lookup[path]
+
+		if let entry = self.lookup[path] {
+			return entry
 		}
-		return entry
+
+		for regexEntry in ZipFileIO.regexList {
+			path = regexEntry.regex.stringByReplacingMatches(in: path, withTemplate: regexEntry.replacement)
+			if let entry = self.lookup[path] {
+				return entry
+			}
+		}
+
+		return nil
 	}
 
 	/// Get the size of a file in the archive
@@ -159,10 +199,10 @@ public struct ZipFileIO: Sendable {
 	///   - path: archive file path
 	/// - Returns: file size
 	public func fileSize(path: String) -> UInt64 {
-		guard let entry = entryForPath(path) else {
-			return 0
+		if let entry = entryForPath(path) {
+			return entry.length
 		}
-		return entry.length
+		return 0
 	}
 
 	/// Load file and return response body
