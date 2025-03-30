@@ -21,13 +21,20 @@ struct ZipServer {
 	
 	static func run(_ bundlePath: String? = nil) {
 		if self.router == nil && bundlePath != nil {
-			self.logger = Logger(label: "swift-web")
-			self.router = Router()
-			self.zipMiddle = ZipMiddleware(bundlePath!, logger: self.logger!)
-			self.router?.add(middleware: self.zipMiddle!)
-			//		self.router.add(middleware: LogRequestsMiddleware(.info))
+			Task {
+				self.logger = Logger(label: "swift-web")
+				self.router = Router()
+				self.zipMiddle = ZipMiddleware(bundlePath!, logger: self.logger!)
+				self.router?.add(middleware: self.zipMiddle!)
+				start()
+			}
 		}
+		else {
+			start()
+		}
+	}
 
+	static func start() {
 		if self.router != nil && self.serverTask == nil {
 			let app = Application(
 				router: self.router!,

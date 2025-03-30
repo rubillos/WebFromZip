@@ -63,6 +63,11 @@ struct WebView: UIViewRepresentable {
 			}
 			decisionHandler(.allow)
 		}
+
+		func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+			print("Navigation failed with error: \(error.localizedDescription)")
+			// Handle the error here, for example, by showing an alert or updating the UI
+		}
 	}
 }
 
@@ -73,6 +78,7 @@ struct ContentView: View {
 	@State private var canGoForward = false
 	@State private var showProgressView = true
 	@State private var isIndexing = false
+	@State private var serverStarted = false
 	@State private var errorMsg = ""
 	@State private var orientation = UIDeviceOrientation.portrait
 
@@ -113,6 +119,7 @@ struct ContentView: View {
 				print("Notification: Indexing...")
 			}
 			NotificationCenter.default.addObserver(forName: .zipServerStarted, object: nil, queue: .main) { _ in
+				self.serverStarted = true
 				if !self.canGoHome {
 					self.canGoHome = true
 					self.goHome()
@@ -127,9 +134,13 @@ struct ContentView: View {
 
 			NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in
 				ZipServer.stop()
+				canGoHome = false
 			}
 			NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
-				ZipServer.run()
+				if self.serverStarted {
+					ZipServer.run()
+					canGoHome = true
+				}
 			}
 		}
 		.onDisappear {
@@ -156,7 +167,7 @@ struct ContentView: View {
 						.padding(20)
 
 					if isIndexing {
-						Text("Indexing...")
+						Text("Indexing")
 							.font(.title)
 							.foregroundColor(.black)
 					}
@@ -326,7 +337,7 @@ struct ContentView: View {
 			ZipServer.run(zipPath!)
 		}
 		else {
-			errorMsg = "No .zip archive found\nin the FileSharing Folder.\n\nPlease add a .zip archive and retry."
+			errorMsg = NSLocalizedString("ZipMissing", comment: "Error: no .zip archive found")
 		}
 	}
 		

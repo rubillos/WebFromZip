@@ -95,37 +95,6 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
 		self.mediaTypeFileExtensionMap = mediaTypeFileExtensionMap
 	}
 
-	public func withAdditionalMediaType(_ mediaType: MediaType, mappedToFileExtension fileExtension: String) -> ZipMiddleware {
-		withAdditionalMediaType(mediaType, mappedToFileExtension: MediaType.FileExtension(fileExtension))
-	}
-
-	public func withAdditionalMediaType(_ mediaType: MediaType, mappedToFileExtension fileExtension: MediaType.FileExtension) -> ZipMiddleware {
-		withAdditionalMediaTypes(forFileExtensions: [fileExtension: mediaType])
-	}
-
-	public func withAdditionalMediaTypes(forFileExtensions extensionToMediaTypeMap: [String: MediaType]) -> ZipMiddleware {
-		withAdditionalMediaTypes(
-			forFileExtensions: extensionToMediaTypeMap.reduce(
-				into: [MediaType.FileExtension: MediaType](),
-				{
-					$0[.init($1.key)] = $1.value
-				}
-			)
-		)
-	}
-
-	public func withAdditionalMediaTypes(forFileExtensions extensionToMediaTypeMap: [MediaType.FileExtension: MediaType]) -> ZipMiddleware {
-		let extensions = mediaTypeFileExtensionMap.merging(extensionToMediaTypeMap, uniquingKeysWith: { _, new in new })
-
-		return ZipMiddleware(
-			fileProvider: fileProvider,
-			urlBasePath: urlBasePath,
-			cacheControl: cacheControl,
-			searchForIndexHtml: searchForIndexHtml,
-			mediaTypeFileExtensionMap: extensions
-		)
-	}
-
 	/// Handle request
 	public func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
 		do {

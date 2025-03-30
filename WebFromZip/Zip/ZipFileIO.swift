@@ -14,6 +14,11 @@ import Logging
 import NIOCore
 import NIOPosix
 
+struct IndexKeys {
+	static var indexVersion: UInt32 = 2
+	static var indexID: UInt64 = 0x5249434B52414E44
+}
+
 public struct ZipEntry : Sendable{
 	let offset: UInt64
 	let length: UInt64
@@ -72,6 +77,24 @@ public struct ZipFileIO: Sendable {
 		setArchivePath(path: zipArchivePath)
 	}
 
+	/// Get the size and creation date of a file
+	/// - Parameters:
+	///	 - path: The file path to get attributes for
+	///	 - Returns: A tuple containing the size of the file and its creation date as a TimeInterval since 1970
+	func getFileSizeAndCreationDate(for path: String) -> (size: UInt64, creationDate: UInt64) {
+		let fileManager = FileManager.default
+		do {
+			let attributes = try fileManager.attributesOfItem(atPath: path)
+			if let fileSize = attributes[.size] as? UInt64,
+			   let creationDate = attributes[.creationDate] as? Date {
+				return (size: fileSize, creationDate: UInt64(creationDate.timeIntervalSince1970))
+			}
+		} catch {
+			print("Error getting file attributes: \(error)")
+		}
+		return (size: 0, creationDate: 0)
+	}
+
 	/// Remove preceding slash
 	///
 	/// - Parameters:
@@ -84,73 +107,105 @@ public struct ZipFileIO: Sendable {
 			let indexPath = self.zipArchivePath.replacingOccurrences(of: ".zip", with: ".idx")
 			if FileManager.default.fileExists(atPath: indexPath) {
 				logger.info("Reading index file")
-				self.lookup = [:]
+				
+				let (size, date) = getFileSizeAndCreationDate(for: self.zipArchivePath)
+
 				let size64 = MemoryLayout<UInt64>.size
 				let data = try Data(contentsOf: URL(fileURLWithPath: indexPath))
 				var offset = 0
-				while offset < data.count {
-					let keyLength = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt32.self) }
-					offset += MemoryLayout<UInt32>.size
-					let keyData = data.subdata(in: offset..<(offset + Int(keyLength)))
-					let key = String(data: keyData, encoding: .utf8)!
-					offset += Int(keyLength)
-					if offset % size64 != 0 {
-						let padding = size64 - (offset % size64)
-						offset += padding
-					}
-					let entryOffset = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
-					offset += size64
-					let entryLength = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
-					offset += size64
-					self.lookup[key] = ZipEntry(offset: entryOffset, length: entryLength)
-				}
-				logger.info("Index contains \(self.lookup.count) file entries")
-			}
-			else {
-				logger.info("Reading from archive")
 
-				NotificationCenter.default.post(name: .zipServerIndexing, object: nil)
+				let fileID = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
+				offset += size64
+				let fileVersion = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt32.self) }
+				offset += MemoryLayout<UInt32>.size
+				offset += MemoryLayout<UInt32>.size
 
-				let zipArchiveURL = URL(fileURLWithPath: self.zipArchivePath)
-				let zipArchive = try Archive(url: zipArchiveURL, accessMode: .read)
-				
-				lookup = [:]
-				
-				let dir = zipArchive.makeIterator()
-				for entry in dir {
-					if !entry.isCompressed {
-						let name = entry.path
-						let offset = entry.dataOffset
-						let length = entry.uncompressedSize
-						self.lookup[name] = ZipEntry(offset: offset, length: length)
-					}
-				}
-				logger.info("Archive contains \(self.lookup.count) files")
+				let fileSize = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
+				offset += size64
+				let fileDate = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
+				offset += size64
 
-				// Serialize lookup dictionary to a compact binary format and write to indexPath
-				logger.info("Writing index file")
-				let size64 = MemoryLayout<UInt64>.size
-				var binaryData = Data()
-				var offset = 0
-				for (key, value) in self.lookup {
-					if let keyData = key.data(using: .utf8) {
-						var keyLength = UInt32(keyData.count)
-						binaryData.append(Data(bytes: &keyLength, count: MemoryLayout<UInt32>.size))
-						binaryData.append(keyData)
-						offset += MemoryLayout<UInt32>.size + keyData.count
+				if fileVersion == IndexKeys.indexVersion && fileID == IndexKeys.indexID && size == fileSize && date == fileDate {
+					self.lookup = [:]
+					while offset < data.count {
+						let keyLength = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt32.self) }
+						offset += MemoryLayout<UInt32>.size
+						let keyData = data.subdata(in: offset..<(offset + Int(keyLength)))
+						let key = String(data: keyData, encoding: .utf8)!
+						offset += Int(keyLength)
 						if offset % size64 != 0 {
 							let padding = size64 - (offset % size64)
-							binaryData.append(Data(count: padding))
 							offset += padding
 						}
-						var offset = value.offset
-						var length = value.length
-						binaryData.append(Data(bytes: &offset, count: size64))
-						binaryData.append(Data(bytes: &length, count: size64))
+						let entryOffset = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
+						offset += size64
+						let entryLength = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt64.self) }
+						offset += size64
+						self.lookup[key] = ZipEntry(offset: entryOffset, length: entryLength)
 					}
+					logger.info("Index contains \(self.lookup.count) file entries")
+					return
 				}
-				try binaryData.write(to: URL(fileURLWithPath: indexPath))
 			}
+
+			logger.info("Reading from archive")
+
+			NotificationCenter.default.post(name: .zipServerIndexing, object: nil)
+			
+			let zipArchiveURL = URL(fileURLWithPath: self.zipArchivePath)
+			let zipArchive = try Archive(url: zipArchiveURL, accessMode: .read)
+			
+			self.lookup = [:]
+			
+			let dir = zipArchive.makeIterator()
+			for entry in dir {
+				if !entry.isCompressed {
+					let name = entry.path
+					let offset = entry.dataOffset
+					let length = entry.uncompressedSize
+					self.lookup[name] = ZipEntry(offset: offset, length: length)
+				}
+			}
+			logger.info("Archive contains \(self.lookup.count) files")
+
+			// Serialize lookup dictionary to a compact binary format and write to indexPath
+			logger.info("Writing index file")
+			let size64 = MemoryLayout<UInt64>.size
+			var binaryData = Data()
+			var offset = 0
+
+			var (size, date) = getFileSizeAndCreationDate(for: self.zipArchivePath)
+
+			binaryData.append(Data(bytes: &IndexKeys.indexID, count: size64))
+			offset += size64
+			binaryData.append(Data(bytes: &IndexKeys.indexVersion, count: MemoryLayout<UInt32>.size))
+			offset += MemoryLayout<UInt32>.size
+			binaryData.append(Data(count: MemoryLayout<UInt32>.size))
+			offset += MemoryLayout<UInt32>.size
+
+			binaryData.append(Data(bytes: &size, count: size64))
+			offset += size64
+			binaryData.append(Data(bytes: &date, count: size64))
+			offset += size64
+
+			for (key, value) in self.lookup {
+				if let keyData = key.data(using: .utf8) {
+					var keyLength = UInt32(keyData.count)
+					binaryData.append(Data(bytes: &keyLength, count: MemoryLayout<UInt32>.size))
+					binaryData.append(keyData)
+					offset += MemoryLayout<UInt32>.size + keyData.count
+					if offset % size64 != 0 {
+						let padding = size64 - (offset % size64)
+						binaryData.append(Data(count: padding))
+						offset += padding
+					}
+					var offset = value.offset
+					var length = value.length
+					binaryData.append(Data(bytes: &offset, count: size64))
+					binaryData.append(Data(bytes: &length, count: size64))
+				}
+			}
+			try binaryData.write(to: URL(fileURLWithPath: indexPath))
 		} catch {
 			logger.info("Failed to initialize zip archive: \(error)")
 		}
